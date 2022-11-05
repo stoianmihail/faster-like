@@ -1,0 +1,1 @@
+select o_comment from orders where o_comment like '%ly__pe__al%';

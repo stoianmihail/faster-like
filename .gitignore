@@ -1,3 +1,10 @@
+.vscode
+build/
+dbgen.sh
+scripts/
+extract.ipynb
+*.in
+
 # Prerequisites
 *.d
 
