@@ -44,11 +44,12 @@ VI naive_like(Data& data, std::string pattern) {
   return ret;
 }
 
-VI like(Data& data, std::string pattern) {
-Timer timer("like");
+template <bool check>
+VI like(Data& data, std::string pattern, unsigned bound = 0) {
+  Timer timer("like");
   unsigned size = pattern.size();
   unsigned lg = FFT::computeLog(4 * size - 1);
-  
+
   // Setup FFTs.
   FFT pt(4 * size - 1, lg);
   FFT pt2(4 * size - 1, lg, &pt);
@@ -71,34 +72,29 @@ Timer timer("like");
   FFT st(4 * size - 1, lg);
   FFT st2(4 * size - 1, lg, &st);
 
+  // Used for iterations.
+  VI *curr = new VI(4 * size - 1);
+
   // Solve for a single string.
   auto solve = [&](std::string& str) {
     auto matchCount = 0;
     unsigned index = 0, limit = str.size();
-    VI *prev, *curr;
-    prev = new VI(2 * size - 1);
-    curr = new VI(2 * size - 1);
 
-    bool first = true;
-    unsigned force = 0;
-    while (true) {
+    bool force = false;
+    while (!force) {
       // Compute the next bound.
-      auto bound = index + size;
-      
+      auto bound = index + 2 * size;
+
       // Does the bound exceed the string size? Then force a match.
       if (bound > limit) {
         bound = limit;
-        ++force;
+        force = true;
       }
-
-      // Is this the first time we forced?
-      if (force == 2)
-        break;
 
       // Init FFT.
       st.init(str, index, bound, [](unsigned c) { return c; });
       st2.init(str, index, bound, [](unsigned c) { return c * c; });
-      
+
       // Transform to frequency domain.
       st.transform();
       st2.transform();
@@ -107,25 +103,16 @@ Timer timer("like");
       st.convolve<true>(pt2, curr, [](int x) { return 2 * x; });
       st2.convolve<false>(pt, curr, [](int x) { return -x; });
 
-      // Reuse results from last iteration.
-      if (!first)
-        for (unsigned ptr = 0; ptr != size - 1; ++ptr)
-          curr->at(ptr) += prev->at(size + ptr);
-
       // Compute the number of matches.
-      for (unsigned ptr = first ? (size - 1) : 0; ptr != size; ++ptr)
+      for (unsigned ptr = size - 1; ptr != 3 * size; ++ptr)
         matchCount += (curr->at(ptr) == patternCheck);
-
-      // Swap `curr` and `prev`.
-      std::swap(curr, prev);
-      first = false;
 
       // And clear the transforms before using them again.
       st.clear();
       st2.clear();
-      
+
       // Increase the current index.
-      index += size;
+      index += size + 1;
     }
     return matchCount;
   };
@@ -153,7 +140,7 @@ VI faster_like(Data& data, std::string pattern, unsigned bound = 0) {
   Timer timer("faster_like");
   unsigned size = pattern.size();
   unsigned lg = FFT::computeLog(2 * size - 1);
-  
+
   // Setup FFTs.
   FFT pt(2 * size - 1, lg);
   FFT pt2(2 * size - 1, lg, &pt);
@@ -181,34 +168,30 @@ VI faster_like(Data& data, std::string pattern, unsigned bound = 0) {
   FFT st(2 * size - 1, lg);
   FFT st2(2 * size - 1, lg, &st);
 
+  VI *prev, *curr;
+  prev = new VI(2 * size - 1);
+  curr = new VI(2 * size - 1);
+
   // Solve for a single string.
   auto solve = [&](std::string& str) {
     auto matchCount = 0;
     unsigned index = 0, limit = str.size();
-    VI *prev, *curr;
-    prev = new VI(2 * size - 1);
-    curr = new VI(2 * size - 1);
 
-    bool first = true;
-    unsigned force = 0;
-    while (true) {
+    bool first = true, force = false;
+    while (!force) {
       // Compute the next bound.
       auto bound = index + size;
-      
+
       // Does the bound exceed the string size? Then force a match.
       if (bound > limit) {
         bound = limit;
-        ++force;
+        force = true;
       }
-
-      // Is this the first time we forced?
-      if (force == 2)
-        break;
 
       // Init FFT.
       st.init(str, index, bound, [](unsigned c) { return c; });
       st2.init(str, index, bound, [](unsigned c) { return c * c; });
-      
+
       // Transform to frequency domain.
       st.transform();
       st2.transform();
@@ -233,7 +216,7 @@ VI faster_like(Data& data, std::string pattern, unsigned bound = 0) {
       // And clear the transforms before using them again.
       st.clear();
       st2.clear();
-      
+
       // Increase the current index.
       index += size;
     }
@@ -261,7 +244,7 @@ VI faster_like(Data& data, std::string pattern, unsigned bound = 0) {
 void same(VI& a, VI& b) {
   assert(a.size() == b.size());
   for (unsigned index = 0, limit = a.size(); index != limit; ++index) {
-    assert(a[index] == b[index]); 
+    assert(a[index] == b[index]);
   }
 }
 
@@ -275,7 +258,7 @@ int main(int argc, char** argv) {
   auto filePath = std::string(argv[1]);
   auto pattern = std::string(argv[2]);
   auto approach = std::string(argv[3]);
-  auto check = (argc == 5) ? std::stoi(argv[4]) : 0; 
+  auto check = (argc == 5) ? std::stoi(argv[4]) : 0;
 
   auto data = readFile(filePath);
   if (approach == "standard") {
