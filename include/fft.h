@@ -112,17 +112,6 @@ public:
     }
 	}
 
-  static unsigned computeLog(unsigned n) {
-    unsigned lg = 0;
-    while ((1u << lg) < n)
-      ++lg;
-    return lg;
-  }
-
-	static int pow3(int x) {
-		return x * x * x;
-	}
-
 	template <bool erase>
   void convolve(FFT& other, VI* ret, std::function<int(int)>&& f) {
     assert(n == other.n);

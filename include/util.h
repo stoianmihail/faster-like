@@ -12,6 +12,19 @@
 
 using namespace std::chrono;
 
+using Data = std::vector<std::string>;
+
+Data readFile(std::string filePath) {
+  std::ifstream in(filePath);
+  assert(in.is_open());
+  Data ret;
+  std::string line;
+  while (std::getline(in, line)) {
+    ret.push_back(line);
+  }
+  return ret;
+}
+
 std::string pretty(std::size_t size) {
   if (size < 1e3) return std::to_string(size);
   if (size < 1e6) return std::to_string(size / 1000) + "K";
