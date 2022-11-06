@@ -59,14 +59,11 @@ public:
 	template <bool reverse = false>
   void init(std::string& str, unsigned begin, unsigned end, std::function<unsigned(unsigned)>&& f) {
     assert(end <= str.size());
-		// std::cerr << "begin=" << begin << " end=" << end << " size=" << data_.size() << std::endl;
-		// assert(end <= data_.size());
-    for (unsigned index = begin; index != end; ++index) {
+		for (unsigned index = begin; index != end; ++index) {
       auto c = str[reverse ? (end - index + begin - 1) : index];
       if (c == '_') {
         continue;
       } else {
-        // assert('a' <= c && c <= 'z');
         data_[index - begin] = complex(f(encode(c)), 0);
       }
     }
@@ -189,7 +186,6 @@ private:
 	void setSize(int ns) {
 		s = ns;
 		n = (1 << s);
-    std::cerr << "n=" << n << std::endl;
 		data_ = VC(n, complex(0, 0));
 		
     if (!sibling_) {
