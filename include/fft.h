@@ -8,6 +8,24 @@
 typedef std::vector<int> VI;
 static constexpr double PI = std::acos(0) * 2;
 
+static constexpr char extra[] = " .,-:?!;";
+
+static int encode(char c) {
+	if (islower(c))
+		return c - 'a' + 1;
+	if (isupper(c))
+		return c - 'A' + 26 + 1;
+	auto shift = 26 + 26;
+	for (auto e : extra) {
+		++shift;
+		if (c == e)
+			return shift;
+	}
+	std::cerr << "c=" << c << std::endl;
+	assert(0);
+	return -1;
+}
+
 class complex {
 public:
 	double a, b;
@@ -38,17 +56,18 @@ public:
     setSize(lg);
   }
 
+	template <bool reverse = false>
   void init(std::string& str, unsigned begin, unsigned end, std::function<unsigned(unsigned)>&& f) {
     assert(end <= str.size());
 		// std::cerr << "begin=" << begin << " end=" << end << " size=" << data_.size() << std::endl;
 		// assert(end <= data_.size());
     for (unsigned index = begin; index != end; ++index) {
-      auto c = str[index];
+      auto c = str[reverse ? (end - index + begin - 1) : index];
       if (c == '_') {
         continue;
       } else {
-        assert('a' <= c && c <= 'z');
-        data_[index - begin] = complex(f(c - 'a' + 1), 0);
+        // assert('a' <= c && c <= 'z');
+        data_[index - begin] = complex(f(encode(c)), 0);
       }
     }
   }
@@ -103,7 +122,12 @@ public:
     return lg;
   }
 
-  void convolve(FFT& other) {
+	static int pow3(int x) {
+		return x * x * x;
+	}
+
+	template <bool erase>
+  void convolve(FFT& other, VI* ret, std::function<int(int)>&& f) {
     assert(n == other.n);
 
     // Convolution in frequency domain.
@@ -113,11 +137,21 @@ public:
 		transform(true);
 
     // And translate back.
-		VI result = VI(size_);
+		assert(ret->size() == size_);
 		for (unsigned i = 0; i != size_; i++) {
-      result[i] = static_cast<int>(data_[i].a + 0.5);
+			if (erase) ret->at(i) = 0;
+			
+			ret->at(i) += f(static_cast<int>(data_[i].a + 0.5));
+			// std::cerr << "i=" << i << " elem=" << data_[i].a << std::endl;
+      // ret[i] = static_cast<int>(data_[i].a + 0.5);
     }
   }
+
+	// void debug(const char* msg) {
+	// 	for (unsigned index = 0; index != n; ++index) {
+	// 		std::cerr << "index=" << index << " elem=" << data_[
+	// 	}
+	// }
 
 #if 0
 	static VI convolution(VI &a, VI &b) {
@@ -159,7 +193,6 @@ private:
 		data_ = VC(n, complex(0, 0));
 		
     if (!sibling_) {
-			std::cerr << "whaat?" << std::endl;
       rev_ = VI(n);
       roots_ = VC(n + 1);
       for (int i = 0; i != n; i++)
