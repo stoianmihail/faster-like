@@ -25,7 +25,9 @@ unsigned like(Data& data, std::string pattern) {
 unsigned faster_like(Data& data, std::string pattern) {
   unsigned size = pattern.size();
   unsigned lg = FFT::computeLog(2 * size - 1);
-  FFT pt(2 * size - 1, lg), pt2(2 * size - 1, lg, &pt);
+  FFT pt(2 * size - 1, lg);
+  // TODO: update this.
+  FFT pt2(2 * size - 1, lg);
   pt.init(pattern, 0, pattern.size(), [](unsigned c) { return c; });
   pt2.init(pattern, 0, pattern.size(), [](unsigned c) { return c * c; });
 
@@ -34,7 +36,9 @@ unsigned faster_like(Data& data, std::string pattern) {
   pt.transform();
   pt2.transform();
 
-  FFT st(2 * size - 1, lg), st2(2 * size - 1, lg, &st);
+  FFT st(2 * size - 1, lg);
+  // TODO: update this
+  FFT st2(2 * size - 1, lg);
   auto solve = [&](std::string& str) {
     unsigned index = 0, limit = str.size();
     while (index + size <= limit) {
@@ -52,7 +56,7 @@ unsigned faster_like(Data& data, std::string pattern) {
       st2.clear();
       
       // Increase the current index.
-      index += size - 1;
+      index += size;
     }
     return 1;
   };

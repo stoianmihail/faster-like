@@ -40,13 +40,15 @@ public:
 
   void init(std::string& str, unsigned begin, unsigned end, std::function<unsigned(unsigned)>&& f) {
     assert(end <= str.size());
+		// std::cerr << "begin=" << begin << " end=" << end << " size=" << data_.size() << std::endl;
+		// assert(end <= data_.size());
     for (unsigned index = begin; index != end; ++index) {
       auto c = str[index];
       if (c == '_') {
         continue;
       } else {
         assert('a' <= c && c <= 'z');
-        data_[index] = complex(f(c - 'a' + 1), 0);
+        data_[index - begin] = complex(f(c - 'a' + 1), 0);
       }
     }
   }
@@ -157,6 +159,7 @@ private:
 		data_ = VC(n, complex(0, 0));
 		
     if (!sibling_) {
+			std::cerr << "whaat?" << std::endl;
       rev_ = VI(n);
       roots_ = VC(n + 1);
       for (int i = 0; i != n; i++)
