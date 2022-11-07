@@ -3,8 +3,8 @@ build/
 dbgen.sh
 scripts/
 extract.ipynb
-*.in
 figures/
+/*.in
 
 # Prerequisites
 *.d
