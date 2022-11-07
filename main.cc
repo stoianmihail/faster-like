@@ -6,7 +6,7 @@
 #include "include/like.h"
 
 int main(int argc, char** argv) {
-  // Example: ./main ../attribute.in ly__pe__al 1
+  // Example: ./main ../random512.in ly__pe__al faster 1
   if ((argc != 4) && (argc != 5)) {
     std::cerr << "Usage: " << argv[0] << " <file> <pattern> <approach['standard', 'faster']> [<check:bool>]" << std::endl;
     exit(-1);
@@ -28,12 +28,6 @@ int main(int argc, char** argv) {
     exp.cmp(ret1, ret2);
   } else if (approach == "faster") {
     auto ret1 = exp.run<Type::FasterParallel>();
-    if (!check)
-      return 0;
-    auto ret2 = exp.run<Type::Naive>();
-    exp.cmp(ret1, ret2);
-  } else if (approach == "double") {
-    auto ret1 = exp.run<Type::DoubleParallel>();
     if (!check)
       return 0;
     auto ret2 = exp.run<Type::Naive>();

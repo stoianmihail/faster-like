@@ -3,6 +3,7 @@ import string
 
 WILDCARD_PROP = 0.2
 
+# Compute average length.
 def computeAvg():
   with open('o_comment.in', 'r') as f:
     count = 0
@@ -12,6 +13,7 @@ def computeAvg():
       count += 1
     print(avg / count)
 
+# Generate random-512.
 def gen_large():
   with open(f'random512.in', 'w') as f:
     for i in range(1500000):
@@ -20,6 +22,7 @@ def gen_large():
         s += random.choice(string.ascii_letters[:26])
       f.write(s + '\n')
   
+# Generate random patterns.
 def gen(len):
   with open(f'patterns/{len}.in', 'w') as f:
     for _ in range(10):
@@ -33,11 +36,7 @@ def gen(len):
       f.write(s + '\n')
 
 def main():
-  lens = [4, 8, 16, 32, 64]
-  computeAvg()
-  # gen_large()
-  # for len in lens:
-  #   gen(len)
+  gen_large()
 
 if __name__ == '__main__':
   main()

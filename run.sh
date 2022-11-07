@@ -37,13 +37,4 @@ for input in patterns/*; do
   done < "$input"
 done;
 
-for input in patterns/*; do
-  echo "$input"
-  while IFS= read -r line
-  do
-    echo "$line"
-    ./build/main $1 "$line" double
-  done < "$input"
-done;
-
 mv experiments ${new_dir}
