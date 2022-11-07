@@ -21,13 +21,13 @@ int main(int argc, char** argv) {
   auto exp = Like(data, pattern, check);
 
   if (approach == "standard") {
-    auto ret1 = exp.run<Type::StandardParallel>();
+    auto ret1 = exp.run<Type::Standard>();
     if (!check)
       return 0;
     auto ret2 = exp.run<Type::Naive>();
     exp.cmp(ret1, ret2);
   } else if (approach == "faster") {
-    auto ret1 = exp.run<Type::FasterParallel>();
+    auto ret1 = exp.run<Type::Faster>();
     if (!check)
       return 0;
     auto ret2 = exp.run<Type::Naive>();

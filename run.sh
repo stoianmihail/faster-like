@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+# Example: ./run.sh o_comment.in
+
 if [ "$#" -ne 1 ]; then
   echo "Illegal number of parameters"
   exit -1

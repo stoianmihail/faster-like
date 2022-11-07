@@ -17,7 +17,7 @@ static const unsigned numThreads = 2 * std::thread::hardware_concurrency();
 enum class Type {
   Naive,
   Standard,
-  FasterParallel,
+  Faster,
 };
 
 // Prepare the transforms.
@@ -316,9 +316,9 @@ private:
     return lg;
   }
 
-	static int pow3(int x) {
-		return x * x * x;
-	}
+  static int pow3(int x) {
+    return x * x * x;
+  }
 
   bool check_;
   Data& data_;
