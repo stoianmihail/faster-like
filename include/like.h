@@ -4,11 +4,12 @@
 #include <fstream>
 #include <atomic>
 #include <thread>
+#include <mutex>
 
 #include "fft.h"
 #include "util.h"
 
-#define DEBUG 0
+#define DEBUG 1
 
 static const unsigned numThreads = 2 * std::thread::hardware_concurrency();
     
@@ -24,9 +25,9 @@ enum class Type {
 // For overlapping substrings: factor = 2 (standard like)
 // For non-overlapping substrings (our approach): factor = 1 (faster like)
 #define preprocess(factor)                                             \
-  auto lg = computeLog(2 * factor * size - 1);                         \
-  FFT pt(2 * factor * size - 1, lg);                                   \
-  FFT pt2(2 * factor * size - 1, lg, &pt);                             \
+  auto lg = computeLog((1 + factor) * size - 1);                       \
+  FFT pt((1 + factor) * size - 1, lg);                                 \
+  FFT pt2((1 + factor) * size - 1, lg, &pt);                           \
   pt.init<true>(pattern_, 0, size, [](unsigned c) { return c; });      \
   pt2.init<true>(pattern_, 0, size, [](unsigned c) { return c * c; }); \
   pt.transform(), pt2.transform();                                     \
@@ -57,46 +58,55 @@ public:
   }
 
 private:
-  void debug(std::string& str, unsigned sol) const {
-    std::cerr << "sol => " << sol << std::endl;
+  void debug(std::string& str, unsigned sol) {
     auto actual = match(str);
-    std::cerr << "actual => " << actual << std::endl;
-    assert(sol == actual);
+    if (sol != actual) {
+      mutex.lock();
+      std::cerr << "str: " << str << std::endl;
+      std::cerr << "sol => " << sol << std::endl;
+      std::cerr << "actual => " << actual << std::endl;
+      assert(sol == actual);
+      mutex.unlock();
+    }
   }
 
   VI runNaive() {
-    Timer timer("naive_like");
+    Timer timer("naive-like", pattern_);
     unsigned m = pattern_.size();
     VI ret;
     for (unsigned index = 0, limit = data_.size(); index != limit; ++index) {
       ret.push_back(match(data_[index]));
     }
     timer.stop();
+    timer.flush();
     timer.debug();
     return ret;
   }
 
   VI runStandard() {
-    Timer timer("like");
+    Timer timer("standard-like", pattern_);
     unsigned size = pattern_.size();
 
     // Prepare the transforms.
     preprocess(2);
 
     // Init the slices transforms.
-    FFT st(4 * size - 1, lg);
-    FFT st2(4 * size - 1, lg, &st);
+    FFT st(3 * size - 1, lg);
+    FFT st2(3 * size - 1, lg, &st);
     
     // Used for iterations.
-    VI *curr = new VI(4 * size - 1);
+    VI *curr = new VI(3 * size - 1);
 
     // Solve for a single string.
     auto solve = [&](std::string& str) {
+      if (str.size() < pattern_.size())
+        return 0;
+
       auto matchCount = 0;
       unsigned index = 0, limit = str.size();
 
       bool force = false;
-      while (!force) {
+      while ((!force) && (index < limit)) {
         // Compute the next bound.
         auto bound = index + 2 * size;
 
@@ -119,7 +129,7 @@ private:
         st2.convolve<false>(pt, curr, [](int x) { return -x; });
 
         // Compute the number of matches.
-        for (unsigned ptr = size - 1; ptr != 3 * size; ++ptr)
+        for (unsigned ptr = size - 1; ptr != 2 * size; ++ptr)
           matchCount += (curr->at(ptr) == patternCheck);
 
         // And clear the transforms before using them again.
@@ -132,23 +142,24 @@ private:
       return matchCount;
     };
 
-    VI checker;
+    VI checker(check_ ? data_.size() : 1);
     for (unsigned index = 0, limit = data_.size(); index != limit; ++index) {
       auto ret = solve(data_[index]);
       if (check_) {
 #if DEBUG
         debug(data_[index], ret);
 #endif
-        checker.push_back(ret);
+        checker[index] = ret;
       }
     }
     timer.stop();
+    timer.flush();
     timer.debug();
     return checker;
   }
 
   VI runStandardParallel() {
-    Timer timer("like");
+    Timer timer("standard-like", pattern_);
     unsigned size = pattern_.size();
 
     // Prepare the transforms.
@@ -160,19 +171,21 @@ private:
     std::atomic<unsigned> taskIndex(0);
     auto consume = [&](unsigned threadIndex) -> void {
       // Init the slices transforms.
-      FFT st(4 * size - 1, lg);
-      FFT st2(4 * size - 1, lg, &st);
+      FFT st(3 * size - 1, lg);
+      FFT st2(3 * size - 1, lg, &st);
       
       // Used for iterations.
-      VI *curr = new VI(4 * size - 1);
+      VI *curr = new VI(3 * size - 1);
 
       // Solve for a single string.
       auto solve = [&](std::string& str) {
+        if (str.size() < pattern_.size())
+          return 0;
         auto matchCount = 0;
         unsigned index = 0, limit = str.size();
 
         bool force = false;
-        while (!force) {
+        while ((!force) && (index < limit)) {
           // Compute the next bound.
           auto bound = index + 2 * size;
 
@@ -195,7 +208,8 @@ private:
           st2.convolve<false>(pt, curr, [](int x) { return -x; });
 
           // Compute the number of matches.
-          for (unsigned ptr = size - 1; ptr != 3 * size; ++ptr)
+          // Note: `bound - index <= 2 * size`, which is the last monomial for a full match.
+          for (unsigned ptr = size - 1, lim = bound - index; ptr != lim; ++ptr)
             matchCount += (curr->at(ptr) == patternCheck);
 
           // And clear the transforms before using them again.
@@ -222,8 +236,12 @@ private:
         // Start linking.
         for (unsigned index = startIndex; index != stopIndex; ++index) {
           auto ret = solve(data_[index]);
-          if (check_)
+          if (check_) {
             checker[index] = ret;
+#if DEBUG
+            debug(data_[index], ret);
+#endif
+          }
         }
       }
     };
@@ -235,12 +253,13 @@ private:
       thread.join();
 
     timer.stop();
+    timer.flush();
     timer.debug();
     return checker;
   }
 
   VI runFaster() {
-    Timer timer("faster_like");
+    Timer timer("faster_like", pattern_);
     unsigned size = pattern_.size();
 
     // Prepare the transforms.
@@ -256,11 +275,14 @@ private:
 
     // Solve for a single string.
     auto solve = [&](std::string& str) {
+      if (str.size() < pattern_.size())
+        return 0;
+
       auto matchCount = 0;
       unsigned index = 0, limit = str.size();
 
       bool first = true, force = false;
-      while (!force) {
+      while ((!force) && (index < limit)) {
         // Compute the next bound.
         auto bound = index + size;
 
@@ -305,23 +327,24 @@ private:
       return matchCount;
     };
 
-    VI checker;
+    VI checker(check_ ? data_.size() : 1);
     for (unsigned index = 0, limit = data_.size(); index != limit; ++index) {
       auto ret = solve(data_[index]);
       if (check_) {
 #if DEBUG
         debug(data_[index], ret);
 #endif
-        checker.push_back(ret);
+        checker[index] = ret;
       }
     }
     timer.stop();
+    timer.flush();
     timer.debug();
     return checker;
   }
 
   VI runFasterParallel() {
-    Timer timer("faster_like");
+    Timer timer("faster-like", pattern_);
     unsigned size = pattern_.size();
 
     // Prepare the transforms.
@@ -342,11 +365,14 @@ private:
 
       // Solve for a single string.
       auto solve = [&](std::string& str) {
+        if (str.size() < pattern_.size())
+          return 0;
+
         auto matchCount = 0;
         unsigned index = 0, limit = str.size();
 
         bool first = true, force = false;
-        while (!force) {
+        while ((!force) && (index < limit)) {
           // Compute the next bound.
           auto bound = index + size;
 
@@ -374,7 +400,8 @@ private:
               curr->at(ptr) += prev->at(size + ptr);
 
           // Compute the number of matches.
-          for (unsigned ptr = first ? (size - 1) : 0; ptr != size; ++ptr)
+          // Note: `bound - index <= size`, which is the last monomial for a full match.
+          for (unsigned ptr = first ? (size - 1) : 0; ptr != bound - index; ++ptr)
             matchCount += (curr->at(ptr) == patternCheck);
 
           // Swap `curr` and `prev`.
@@ -405,8 +432,12 @@ private:
         // Start linking.
         for (unsigned index = startIndex; index != stopIndex; ++index) {
           auto ret = solve(data_[index]);
-          if (check_)
+          if (check_) {
+#if DEBUG
+            debug(data_[index], ret);
+#endif
             checker[index] = ret;
+          }
         }
       }
     };
@@ -418,6 +449,7 @@ private:
       thread.join();
 
     timer.stop();
+    timer.flush();
     timer.debug();
     return checker;
   }
@@ -456,4 +488,5 @@ private:
   bool check_;
   Data& data_;
   std::string pattern_;
+  std::mutex mutex;
 };

@@ -4,6 +4,7 @@ dbgen.sh
 scripts/
 extract.ipynb
 *.in
+figures/
 
 # Prerequisites
 *.d

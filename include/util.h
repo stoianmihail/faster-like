@@ -43,8 +43,9 @@ void error(const char* str, std::string tmp) {
 
 class Timer {
 public:
-  Timer(std::string approach, bool startByDefault = true)
+  Timer(std::string approach, std::string pattern, bool startByDefault = true)
   : approach(approach),
+    pattern(pattern),
     calledStop(false) {
       if (startByDefault)
         start();
@@ -60,30 +61,32 @@ public:
     stop_ = ::high_resolution_clock::now();
   }
 
-  void flush(std::string query, std::string approach, unsigned numThreads) {
-    auto start_dir = "../experiments/";
+  void flush() {
+    auto start_dir = "experiments/";
     std::string filename = start_dir
-                         + approach;
-    std::cerr << "filename=" << filename << std::endl;
-    std::time_t t = std::time(0);
-    std::tm* now = std::localtime(&t);
-    filename += "_" + std::to_string(now->tm_hour + 1) + "-" + std::to_string(now->tm_min) + "-" + std::to_string(now->tm_sec);
-    filename += "_" + std::to_string(duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
-    filename += ".out";
+                         + approach
+                         + "-"
+                         + std::to_string(pattern.size())
+                         + "-"
+                         + pattern
+                         + ".out";
     std::ofstream out(filename);
-    assert(out.is_open());
+    // assert(out.is_open());
     out << "Approach: " << approach << std::endl;
-    out << "Total: " << duration_cast<milliseconds>(stop_ - start_).count() << std::endl;
+    out << "Pattern: " << pattern << std::endl;
+    out << "Total: " << duration_cast<milliseconds>(stop_ - start_).count() << " ms " << std::endl;
   }
 
   void debug() {
     auto total = duration_cast<milliseconds>(stop_ - start_).count();
     std::cout << "approach=" << approach
+              << ", pattern=" << pattern
               << ", time=" << total << " ms" << std::endl;
   }
 
 private:
   std::string approach;
+  std::string pattern;
   bool calledStop;
   high_resolution_clock::time_point start_, stop_;
 };
