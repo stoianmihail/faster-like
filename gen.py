@@ -17,6 +17,8 @@ def computeAvg():
 def gen_large():
   with open(f'random512.in', 'w') as f:
     for i in range(1500000):
+      if i and i % 10000 == 0:
+        print(f'Checkpoint: {i}')
       s = ""
       for j in range(512):
         s += random.choice(string.ascii_letters[:26])

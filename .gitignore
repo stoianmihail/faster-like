@@ -2,7 +2,6 @@
 build/
 dbgen.sh
 scripts/
-extract.ipynb
 figures/
 /*.in
 
