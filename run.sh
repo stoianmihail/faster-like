@@ -14,8 +14,8 @@ fi
 mkdir -p experiments
 
 dir="experiments-${1//.in}"
-current_time=$(date "+%H:%M:%S_%Y-%m-%d")
-new_dir="${dir}_${current_time}"
+current_time=$(date "+%H:%M:%S-%Y-%m-%d")
+new_dir="${dir}-${current_time}"
 
 cd build && make -j20 && cd ..
 
@@ -34,6 +34,15 @@ for input in patterns/*; do
   do
     echo "$line"
     ./build/main $1 "$line" standard
+  done < "$input"
+done;
+
+for input in patterns/*; do
+  echo "$input"
+  while IFS= read -r line
+  do
+    echo "$line"
+    ./build/main $1 "$line" double
   done < "$input"
 done;
 

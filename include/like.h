@@ -19,6 +19,8 @@ enum class Type {
   StandardParallel,
   Faster,
   FasterParallel,
+  Double,
+  DoubleParallel,
 };
 
 // Prepare the transforms.
@@ -46,6 +48,7 @@ public:
       case Type::StandardParallel: return runStandardParallel();
       case Type::Faster: return runFaster();
       case Type::FasterParallel: return runFasterParallel();
+      case Type::DoubleParallel: return runDoubleParallel();
       default: return {};
     }
   }
@@ -310,7 +313,7 @@ private:
             curr->at(ptr) += prev->at(size + ptr);
 
         // Compute the number of matches.
-        for (unsigned ptr = first ? (size - 1) : 0; ptr != size; ++ptr)
+        for (unsigned ptr = first ? (size - 1) : 0; ptr != bound - index; ++ptr)
           matchCount += (curr->at(ptr) == patternCheck);
 
         // Swap `curr` and `prev`.
@@ -414,6 +417,116 @@ private:
 
           // Increase the current index.
           index += size;
+        }
+        return matchCount;
+      };
+
+      while (taskIndex.load() < numTasks) {
+        unsigned i = taskIndex++;
+        if (i >= numTasks)
+          return;
+        
+        // Compute the range.
+        unsigned startIndex = taskSize * i;
+        unsigned stopIndex = taskSize * (i + 1);
+        if (i == numTasks - 1)
+          stopIndex = data_.size();
+        
+        // Start linking.
+        for (unsigned index = startIndex; index != stopIndex; ++index) {
+          auto ret = solve(data_[index]);
+          if (check_) {
+#if DEBUG
+            debug(data_[index], ret);
+#endif
+            checker[index] = ret;
+          }
+        }
+      }
+    };
+
+    std::vector<std::thread> threads;
+    for (unsigned index = 0, limit = numThreads; index != limit; ++index)
+      threads.emplace_back(consume, index);
+    for (auto& thread : threads)
+      thread.join();
+
+    timer.stop();
+    timer.flush();
+    timer.debug();
+    return checker;
+  }
+
+  VI runDoubleParallel() {
+    Timer timer("double-like", pattern_);
+    unsigned size = pattern_.size();
+
+    // Prepare the transforms.
+    preprocess(2);
+
+    VI checker(check_ ? data_.size() : 1);
+    unsigned taskSize = 10'000;
+    unsigned numTasks = data_.size() / taskSize + (data_.size() % taskSize != 0);
+    std::atomic<unsigned> taskIndex(0);
+    auto consume = [&](unsigned threadIndex) -> void {
+      // Init the slices transforms.
+      FFT st(3 * size - 1, lg);
+      FFT st2(3 * size - 1, lg, &st);
+      
+      VI *prev, *curr;
+      prev = new VI(3 * size - 1);
+      curr = new VI(3 * size - 1);
+
+      // Solve for a single string.
+      auto solve = [&](std::string& str) {
+        if (str.size() < pattern_.size())
+          return 0;
+
+        auto matchCount = 0;
+        unsigned index = 0, limit = str.size();
+
+        bool first = true, force = false;
+        while ((!force) && (index < limit)) {
+          // Compute the next bound.
+          auto bound = index + 2 * size;
+
+          // Does the bound exceed the string size? Then force a match.
+          if (bound > limit) {
+            bound = limit;
+            force = true;
+          }
+
+          // Init FFT.
+          st.init(str, index, bound, [](unsigned c) { return c; });
+          st2.init(str, index, bound, [](unsigned c) { return c * c; });
+
+          // Transform to frequency domain.
+          st.transform();
+          st2.transform();
+
+          // Perform convolutions. Note: the order matters, as first we call `convolve<true>`.
+          st.convolve<true>(pt2, curr, [](int x) { return 2 * x; });
+          st2.convolve<false>(pt, curr, [](int x) { return -x; });
+
+          // Reuse results from last iteration.
+          if (!first)
+            for (unsigned ptr = 0; ptr != size - 1; ++ptr)
+              curr->at(ptr) += prev->at(2 * size + ptr);
+
+          // Compute the number of matches.
+          for (unsigned ptr = first ? (size - 1) : 0; ptr != bound - index; ++ptr)
+            matchCount += (curr->at(ptr) == patternCheck);
+          
+          // Swap `curr` and `prev`.
+          std::swap(curr, prev);
+          first = false;
+
+          // And clear the transforms before using them again.
+          st.clear();
+          st2.clear();
+
+          // Increase the current index.
+          index += 2 * size;
         }
         return matchCount;
       };

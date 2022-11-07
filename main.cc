@@ -32,6 +32,12 @@ int main(int argc, char** argv) {
       return 0;
     auto ret2 = exp.run<Type::Naive>();
     exp.cmp(ret1, ret2);
+  } else if (approach == "double") {
+    auto ret1 = exp.run<Type::DoubleParallel>();
+    if (!check)
+      return 0;
+    auto ret2 = exp.run<Type::Naive>();
+    exp.cmp(ret1, ret2);
   } else {
     assert(0);
   }
